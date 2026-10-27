@@ -1,0 +1,180 @@
+Edge AI notes:
+8/10/26
+Ensure all components/actuators such as board, LED/DISPLAY etc is within the current limit of USB board.
+Avoid connecting ANYTHING to a faulty ac supply.
+OS assigns a Communication port [COM port] to the USB o/p
+NOTE:- A power cable never opens up a COM Port. Only a data cable does this task.
+Any program run:
+Interpreter --> Compiler --> Assembler --> Machine code -->Runs on CPU
+Cross compilation vs Native compilation
+Cross compilation -- runs on another system;
+Native compilation -- runs on same system;
+Instruction set: What circuits exist in the processor (RISC vs CISC)
+Instruction set maps C code to Assembly code which is machine specific by understanding the specific architecture of the machine and thus runs a different bytecode for a different machine;
+Board manager packages help the system to identify the hardware and produce the corresponding ASM and bytecode;
+
+High Level Language (C code) - machine agnostic
+Machine level code (ASM) - machine non agnostic
+thus same C code runs differently on different machines.
+
+VSCode: Platform IO package -- to run esp/Arduino code
+
+Use flash memory to store weights instead of RAM
+
+devkit -- 16mb rom/flash + 8mb ram; usually it stores 2 copies of weights of NN -- one in flash & 1 in RAM-- try to find a way to keep only the flash copy and use that extra ram for something else;
+
+Use 2 cores -- one for ML and one for data processing;
+PSRAM - pseudostatic RAM;
+RAM leaks quickly--needs to be refreshed-- RAM can change quickly -- low insulation barrier; 
+Flash -- high insulation barrier -- decays voltage slowly hence it is non volatile (but it may lose after infinite time or large time);
+Repeated writing to flash/ram can degrade it -- lead to ssd/hdd corruption; [mainly ssd]
+320kb sram on esp board + psram (extra)-- for program, it appears as one memory i.e. RAM; however psram is much slower access than sram;
+
+Communication between two nodes must be at the same rate: otherwise the sampling of bytes of data would be incorrect leading to corrupted or wrong output.
+
+Given sketch: 
+void setup() {
+  // put your setup code here, to run once:
+  Serial.begin(115200);
+}
+
+void loop() {
+  // put your main code here, to run repeatedly:
+  Serial.println("Hello World!");
+  delay(100);
+}
+Sketch uses 273605 bytes (20%) of program storage space. Maximum is 1310720 bytes.
+Global variables use 21592 bytes (6%) of dynamic memory, leaving 306088 bytes for local variables. Maximum is 327680 bytes.
+esptool v5.3.1 -- with default 4mb app/ 12mb space spisfs or something;
+
+changing the partition scheme to 3mb app/ 9mb fafts will result in :
+Sketch uses 273605 bytes (8%) of program storage space. Maximum is 1310720 bytes.
+Global variables use 21592 bytes (//some value%) of dynamic memory, leaving (x>306088) bytes for local variables. Maximum is [y>327680] bytes.
+esptool v5.3.1
+
+now add OPI PSRAM and see changes:
+Sketch uses 273605 bytes (8%) of program storage space. Maximum is 3245728 bytes.
+Global variables use 21592 bytes (some_Val%) of dynamic memory, leaving (x>306088) bytes for local variables. Maximum is (y>327680) bytes.
+esptool v5.3.1
+
+It does not change because it does not display PSRAM info but only SRAM info. 
+
+volatile int sum // will ensure to avoid precalculation;
+volatile tells the compiler:
+
+Do not assume this variable stays unchanged. Always actually perform the reads and writes to it. Without volatile, the compiler may notice that you're calculating sum, but that the result isn't really being used in a meaningful way. With optimization enabled, it could potentially simplify or even remove some of the calculation.
+
+Better representation via cycle count instead of calculated time; Profiling code: Mention system and frequency of the system and mention the cycle count. Time will thereby vary and time means cycle count;
+
+---------------------------------------------------------------------------------------------------------
+15/10/26
+AI must infer faster than it can accept data else the machine goes out of sync each time;
+Not necessary to train on edge but u can -- main idea is train on heavy computing and fast data pipelining mechanism and deploy/inference runs on edge;
+Need mechanism to communicate the real time inference out of the edge device;
+3 main things for edge ai: Fast inference [real time in sync], fast data receival and efficient communication mechanism to send the AI inference out of the edge device to the relevant source;
+Energy requirements of ai -- energy costs run the markets and govern overall company economics in the ai market; Main goal is to identify the ways to optimise a model to an existing hardware -- cause: ai models update and scale very fast which hardware cannot update to thus there is a need for optimising ai models for existing hardwares;
+
+Definitions:
+Sensor - Anything that can sense changes in the surroundings and convert it into some form of data [electrical signal]* 
+*it is important to mention the fact that it can change data for an edge AI context definition of a sensor
+Embedded system: A system that is programmed to perform a *specific* task
+Nore: each component in an embedded system may be general purpose compatible however, they are reprogrammed to do a specific task and can be reprogrammed to do a different task;
+Note: An embedded system need not always have an ASIC (Application specific Chip);
+Model:Mathematical equivalent of a function which can be implemented in an edge AI scenario
+Training: Building a model from inference
+Edge device: a device close/closest to the source of the data;
+cloud is furthest away from data whereas edge is the closest to data
+Edge AI device and TinyML: Any device that consumes less than 1 watt power
+Signal processing is required for feature engineering;
+Edge AI framework: BLERP - Bandwidth, Latency, Economics, Reliability, Privacy;
+
+Bandwitdh: sensors produce more data than networks can carry cheaply --> reduction in amt of data being transmitted
+Latency: rtos ensures worst case latency is guarded. RTOS is used in systems like aircrafts and cars but not in laptops. Edge devices neccesarilly need low latency to work properly
+Economics: Cloud bills you each time whereas a chip is paid for only once;
+Reliability: The network isn't always present but the machine keeps running anyways [in cloud the entire infrastructure relies on cloud hence it is less reliable than edge]
+Privacy: data privacy for edge ai- data never leaves the device.
+
+"A product does not need all 5 blerp, one strong letter is enough" - worth building an edge device if at least we have one of b,l,e,r,p;
+
+Note: The edge is not free, we pay in 3 ways:
+i) Small: The model must be small enough to fit into the small device (feature engineering, aiml engineering cost)
+ii)Scattered: more devices, more costs
+iii) Varied: varied across deployments and has costs
+
+when the right answer is cloud and not edge?
+1. Large model size
+2. It needs user experience data
+3. Retraining the model happens very frequently
+4. Low volume data, nothing private
+
+Wake up models -- use a call/keyword to wake up a model [e.g. hey siri]
+The wake up mechanism may be edge computed and it can wake up a larger model and features which run on cloud service;
+
+Time series data may have dependency in short intervals but not in the long interval of time;
+Sample interval of time taken to identify the time series signature as a feature is problem dependent; [should i sample after every 1 sec or 1 hour?]
+-----------------------------------------------------------------------------------------------------------------------------------------------------------
+22/10/26
+weights during training - volatile [flash]
+weights during inference - non volatile [RAM]
+inputs during training - preferably volatile
+basic idea: Anything that changes during execution will be stored in volatile memory whereas anything that remains constant is preferred to be stored in non volatile space [i.e. flash]
+Five patterns for splitting the work.
+1 · On-device
+2 · Edge filter
+3 · Cascade
+4 · Gateway
+5 · Split model
+
+1. On device - B[saved bandwidth], L[Round trip latency {to and from cloud} is saved], E[cannot comment so not considered- it may be applicable for a specific use case], R [high reliability], P [Privacy is mentioned];
+
+2. Edge filter [e.g. voice assistant] - if the data is relevant, send it to the cloud; The edge filter identifies what data must go to the cloud;
+	What BLERP is relevant: Bandwidth [saved], Latency [cant comment, subject to cloud availability; however the irrelevant data is not sent to cloud and that latency is reduced], Economics [if something is bad data, dont waste time analysing it, but if something is good we send it to cloud for additional processing; Transmission of data from edge to cloud is less cost due to avoidance of redundant data... however hardware and total infra cost remains the same; Only transmission cost is saved]
+
+3. Cascade: input -> tiny model (edge; always on and consumes power constantly) -> big model or processor (only turned on when needed and consumes power only when turned on) -> cloud
+	E.g. - A microcontroller handles the initial work and behaves like a tiny model which may sometimes wake up the microprocessor (bigger model); It may be noted that both the tiny and large models can be on the same chip (e.g. recent Arduino chips with dual microcontroller and microprocessor);
+BLERP: Along with B,L, E++ i.e. it reduces latency and cloud costs to a much larger extent and allows for local processing to save time and cost; economically better solution to edge filters);
+
+4.Gateway: multiple small sensors -> shared gateway / processing unit ->alarm, cloud (bidirectional arrow);
+Main difference here is that it does the feature extraction or relations between various sensors data. Sensors have to be related to each other such that there exist features that the shared brain can identify therefore choice of sensors is necessary such that they are similar in nature;
+Applications - systems like EV, Sensor fusion approach, Industrial systems
+
+5.Split computation: Split the model into two parts and keep some of it on the cloud;
+Feature extraction or feature map is built on the edge device and that is sent to the cloud for the training part;
+Active current research and complicated to maintain; not much has been inferred yet;
+
+A rough guide to choosing:
+Is there a reliable network at all? --> no --> Fully on-device
+		|
+		v
+Is each sensor too small to run a model? --> yes --> Gateway aggregation
+		|
+		v
+Is nothing happening most of the time? --> yes --> Cascade
+		|
+		v
+Is the raw data heavy, but deeper analysis wanted? --> yes --> Edge filter, cloud analysis
+		|
+		v
+Is the model too big for the device? --> yes --> Split computation
+
+
+When unsure:
+graceful degradation
+What does the product do when the model is not confident, or the network is down? A safe default beats a guess.
+
+Ask a human
+human in the loop
+Send low-confidence cases to a person. Their answers become labelled data for the next model.
+
+Plan v2
+over-the-air updates
+The model you ship on day one will not be the last. Design the update path before you need it.
+
+Running average in time series data --> needs memory
+in static csv data, it can be calculated directly;
+Signal processing techniques help us to identify real time data to do real time signal processing and feature extraction;
+Don't treat data as a table but treat it as a signal instead to do real time signal processing;
+
+Data pipeline has 3 stages: Ingestion --> processing --> storage;
+Sampling rate - finiteness on x axis
+resolution - finiteness on y axis
